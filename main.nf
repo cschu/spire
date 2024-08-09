@@ -182,7 +182,7 @@ process binning {
             //  -i ${sample_id}-assembled.fa.filtered.fasta \
     """
     metabat2 --verbose \
-             -i ${assembly_file}
+             -i ${assembly_file} \
              -a ${depthfile} \
              -t 4 \
              --seed 1987 \
