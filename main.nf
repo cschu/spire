@@ -493,6 +493,8 @@ workflow {
 
     depth_ch.dump(pretty: true, tag: "depth_ch")
 
+    gene_calling_prodigal(contigs_ch)
+
     // binning(depths.out.join(remove_small_contigs.out))
     binning(depth_ch.join(contigs_ch, by: 0))
     per_bin_genecalling(binning.out.join(gene_calling_prodigal.out.genecalls_faa).join(gene_calling_prodigal.out.genecalls_fna))
