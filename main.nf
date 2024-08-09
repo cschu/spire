@@ -179,9 +179,10 @@ process binning {
 
     script:
     def sample_basename = "${sample_id}.${params.assemblytype}.${params.bintype}"
+            //  -i ${sample_id}-assembled.fa.filtered.fasta \
     """
     metabat2 --verbose \
-             -i ${sample_id}-assembled.fa.filtered.fasta \
+             -i ${assembly_file}
              -a ${depthfile} \
              -t 4 \
              --seed 1987 \
@@ -463,32 +464,44 @@ process gtdbtk {
 
 workflow {
 
-    if (params.NCBI_API_KEY == 'none') {
-    input_samples = Channel
-        .fromSRA(params.input_SRA_id)
-        .view()
-    }
-    else {
-    input_samples = Channel
-        .fromSRA(params.input_SRA_id, apiKey:params.NCBI_API_KEY)
-        .view()
-    }
+    // if (params.NCBI_API_KEY == 'none') {
+    // input_samples = Channel
+    //     .fromSRA(params.input_SRA_id)
+    //     .view()
+    // }
+    // else {
+    // input_samples = Channel
+    //     .fromSRA(params.input_SRA_id, apiKey:params.NCBI_API_KEY)
+    //     .view()
+    // }
 
-    preprocess_fastqs(input_samples)
-    assembly(preprocess_fastqs.out.filtered)
-    gene_calling_prodigal(assembly.out)
-    remove_small_contigs(assembly.out)
-    index(remove_small_contigs.out)
-    alignment(remove_small_contigs.out.join(index.out).join(preprocess_fastqs.out.filtered))
-    depths(alignment.out)
-    binning(depths.out.join(remove_small_contigs.out))
+    // preprocess_fastqs(input_samples)
+    // assembly(preprocess_fastqs.out.filtered)
+    // gene_calling_prodigal(assembly.out)
+    // remove_small_contigs(assembly.out)
+    // index(remove_small_contigs.out)
+    // alignment(remove_small_contigs.out.join(index.out).join(preprocess_fastqs.out.filtered))
+    // depths(alignment.out)
+
+    contigs_ch = Channel.fromPath(params.assembly_input + "/**.${params.suffix_pattern}")
+        .map { file -> return tuple(file.getParent().getName(), file) }
+
+    contigs_ch.dump(pretty: true, tag: "contigs_ch")
+    
+    depth_ch = Channel.fromPath(params.depth_input + "/**.tsv")
+        .map { file -> return tuple(file.getParent().getName(), file) }
+
+    depth_ch.dump(pretty: true, tag: "depth_ch")
+
+    // binning(depths.out.join(remove_small_contigs.out))
+    binning(depth_ch.join(contigs_ch, by: 0))
     per_bin_genecalling(binning.out.join(gene_calling_prodigal.out.genecalls_faa).join(gene_calling_prodigal.out.genecalls_fna))
-    assembly_stats(assembly.out)
-    assembly_mash_sketching(assembly.out)
+    assembly_stats(contigs_ch)
+    assembly_mash_sketching(contigs_ch)
     bin_mash_sketching(binning.out)
-    rrna_detection(assembly.out)
+    rrna_detection(contigs_ch)
     abricate(gene_calling_prodigal.out.genecalls_fna)
-    macrel(assembly.out)
+    macrel(contigs_ch)
     gunc(binning.out)
     checkm2(binning.out)
     eggnog_mapper(gene_calling_prodigal.out.genecalls_faa)
