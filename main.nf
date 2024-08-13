@@ -464,6 +464,8 @@ process gtdbtk {
 
 workflow {
 
+    print "PARAMS: ${params}"
+
     // if (params.NCBI_API_KEY == 'none') {
     // input_samples = Channel
     //     .fromSRA(params.input_SRA_id)
