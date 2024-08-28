@@ -221,6 +221,9 @@ process per_bin_genecalling {
     """
     mkdir ${sample_id}
 
+    gzip -dc ${genecalls_faa} > genecalls_extracted.faa
+    gzip -dc ${genecalls_fna} > genecalls_extracted.fna
+
     for bin in bins/*
     do
       bin_id=\${bin:5:\${#bin}-11}
@@ -229,12 +232,12 @@ process per_bin_genecalling {
       zcat \$bin | grep ">" | cut -c2- | cut -d " " -f1 | sed -e 's/\$/_/' > \${bin_id}.contig.names
 
       ## Get all genenames contining bin names
-      zcat ${genecalls_faa} | grep -f \${bin_id}.contig.names | cut -c2- | cut -f1 -d" " > \${bin_id}.faa.gene_names
-      zcat ${genecalls_fna} | grep -f \${bin_id}.contig.names | cut -c2- | cut -f1 -d" " > \${bin_id}.fna.gene_names
+      cat genecalls_extracted.faa | grep -f \${bin_id}.contig.names | cut -c2- | cut -f1 -d" " > \${bin_id}.faa.gene_names
+      cat genecalls_extracted.fna | grep -f \${bin_id}.contig.names | cut -c2- | cut -f1 -d" " > \${bin_id}.fna.gene_names
 
       ## Get all sequences with genenames in fasta_search
-      seqtk subseq -l 60 ${genecalls_faa} \${bin_id}.faa.gene_names > ${sample_id}/\${bin_id}.extracted.faa
-      seqtk subseq -l 60 ${genecalls_fna} \${bin_id}.fna.gene_names > ${sample_id}/\${bin_id}.extracted.fna
+      seqtk subseq -l 60 genecalls_extracted.faa \${bin_id}.faa.gene_names > ${sample_id}/\${bin_id}.extracted.faa
+      seqtk subseq -l 60 genecalls_extracted.fna \${bin_id}.fna.gene_names > ${sample_id}/\${bin_id}.extracted.fna
     done
     for x in ${sample_id}/*;
     do
@@ -243,6 +246,8 @@ process per_bin_genecalling {
           rm \$x
       fi
     done
+
+    rm -rvf genecalls_extracted.faa genecalls_extracted.fna
     """
 }
 
