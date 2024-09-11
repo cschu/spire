@@ -215,7 +215,7 @@ process per_bin_genecalling {
     tuple val(sample_id), file('bins/*'), file(genecalls_faa), file(genecalls_fna)
 
     output:
-    tuple val(sample_id), file("${sample_id}/*")
+    tuple val(sample_id), file("${sample_id}/*"), emit: bincalls
 
     script:
     """
@@ -504,7 +504,19 @@ workflow {
 
     // binning(depths.out.join(remove_small_contigs.out))
     binning(depth_ch.join(contigs_ch, by: 0))
-    per_bin_genecalling(binning.out.join(gene_calling_prodigal.out.genecalls_faa).join(gene_calling_prodigal.out.genecalls_fna))
+
+    calls = binning.out.join(gene_calling_prodigal.out.genecalls_faa).join(gene_calling_prodigal.out.genecalls_fna)
+        .flatMap { sample_id, bins, proteins, genes -> 
+            bins.collect {
+                bin -> tuple(sample_id, bin, proteins, genes)
+            }
+        }
+
+    per_bin_genecalling(calls)
+
+    bincalls = per_bin_genecalling.out.bincalls
+        .groupTuple(by: 0)
+
     assembly_stats(contigs_ch)
     assembly_mash_sketching(contigs_ch)
     bin_mash_sketching(binning.out)
@@ -514,6 +526,6 @@ workflow {
     gunc(binning.out)
     checkm2(binning.out)
     eggnog_mapper(gene_calling_prodigal.out.genecalls_faa)
-    rgiv6(per_bin_genecalling.out)
+    rgiv6(bincalls)
     gtdbtk(binning.out)
 }
