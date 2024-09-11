@@ -526,6 +526,6 @@ workflow {
     gunc(binning.out)
     checkm2(binning.out)
     eggnog_mapper(gene_calling_prodigal.out.genecalls_faa)
-    rgiv6(bincalls)
+    rgiv6(per_bin_genecalling.out.bincalls)
     gtdbtk(binning.out)
 }
