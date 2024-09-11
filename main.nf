@@ -218,11 +218,16 @@ process per_bin_genecalling {
     tuple val(sample_id), file("${sample_id}/*"), emit: bincalls
 
     script:
+    //   cat genecalls_extracted.faa.ids | grep -f \${bin_id}.contig.names | cut -c2- | cut -f1 -d" " > \${bin_id}.faa.gene_names
+    //   cat genecalls_extracted.fna.ids | grep -f \${bin_id}.contig.names | cut -c2- | cut -f1 -d" " > \${bin_id}.fna.gene_names
     """
     mkdir ${sample_id}
 
     gzip -dc ${genecalls_faa} > genecalls_extracted.faa
     gzip -dc ${genecalls_fna} > genecalls_extracted.fna
+
+    grep "^>" genecalls_extracted.faa | cut -c2- | cut -f1 -d" " > genecalls_extracted.faa.ids
+    grep "^>" genecalls_extracted.fna | cut -c2- | cut -f1 -d" " > genecalls_extracted.fna.ids
 
     for bin in bins/*
     do
@@ -232,8 +237,8 @@ process per_bin_genecalling {
       zcat \$bin | grep ">" | cut -c2- | cut -d " " -f1 | sed -e 's/\$/_/' > \${bin_id}.contig.names
 
       ## Get all genenames contining bin names
-      cat genecalls_extracted.faa | grep -f \${bin_id}.contig.names | cut -c2- | cut -f1 -d" " > \${bin_id}.faa.gene_names
-      cat genecalls_extracted.fna | grep -f \${bin_id}.contig.names | cut -c2- | cut -f1 -d" " > \${bin_id}.fna.gene_names
+      grep -f \${bin_id}.contig.names genecalls_extracted.faa.ids > \${bin_id}.faa.gene_names
+      grep -f \${bin_id}.contig.names genecalls_extracted.fna.ids > \${bin_id}.fna.gene_names
 
       ## Get all sequences with genenames in fasta_search
       seqtk subseq -l 60 genecalls_extracted.faa \${bin_id}.faa.gene_names > ${sample_id}/\${bin_id}.extracted.faa
@@ -247,7 +252,7 @@ process per_bin_genecalling {
       fi
     done
 
-    rm -rvf genecalls_extracted.faa genecalls_extracted.fna
+    rm -rvf genecalls_extracted.faa genecalls_extracted.fna genecalls_extracted.faa.ids genecalls_extracted.fna.ids
     """
 }
 
