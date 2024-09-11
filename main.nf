@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
  
 process preprocess_fastqs {
-    publishDir "${params.outdir}/${sample_id}/filtering/${sample_id}"
+    publishDir "${params.outdir}/${sample_id}/filtering/${sample_id}", mode: "copy"
 
     input:
     tuple val(sample_id), path(fastq_files)
@@ -23,7 +23,7 @@ process preprocess_fastqs {
 }
 
 process assembly {
-    publishDir "${params.outdir}/${sample_id}/assemblies/"
+    publishDir "${params.outdir}/${sample_id}/assemblies/", mode: "copy"
 
     input:
     tuple val(sample_id), path('*')
@@ -62,7 +62,7 @@ process assembly {
 }
 
 process gene_calling_prodigal {
-    publishDir "${params.outdir}/${sample_id}/prodigal/"
+    publishDir "${params.outdir}/${sample_id}/prodigal/", mode: "copy"
     
     input:
     tuple val(sample_id), file(unfiltered_assembly)
@@ -154,7 +154,7 @@ process alignment {
 }
 
 process depths {
-    publishDir "${params.outdir}/${sample_id}/bins/"
+    publishDir "${params.outdir}/${sample_id}/bins/", mode: "copy"
 
     input:
     tuple val(sample_id), file(bam_file)
@@ -169,7 +169,7 @@ process depths {
 }
 
 process binning {
-    publishDir "${params.outdir}/${sample_id}/"
+    publishDir "${params.outdir}/${sample_id}/", mode: "copy"
 
     input:
     tuple val(sample_id), file(depthfile), file(assembly_file)
@@ -209,7 +209,7 @@ process binning {
 }
 
 process per_bin_genecalling {
-    publishDir "${params.outdir}/${sample_id}/per_bin_genecalls/"
+    publishDir "${params.outdir}/${sample_id}/per_bin_genecalls/", mode: "copy"
 
     input:
     tuple val(sample_id), file('bins/*'), file(genecalls_faa), file(genecalls_fna)
@@ -257,7 +257,7 @@ process per_bin_genecalling {
 }
 
 process assembly_stats {
-    publishDir "${params.outdir}/${sample_id}/assembly_stats/"
+    publishDir "${params.outdir}/${sample_id}/assembly_stats/", mode: "copy"
 
     input:
     tuple val(sample_id), file(unfiltered_assembly)
@@ -274,7 +274,7 @@ process assembly_stats {
 }
 
 process assembly_mash_sketching {
-    publishDir "${params.outdir}/${sample_id}/assembly_mash_sketching/"
+    publishDir "${params.outdir}/${sample_id}/assembly_mash_sketching/", mode: "copy"
 
     input:
     tuple val(sample_id), file(unfiltered_assembly)
@@ -290,7 +290,7 @@ process assembly_mash_sketching {
 }
 
 process bin_mash_sketching {
-    publishDir "${params.outdir}/${sample_id}/bin_mash_sketching/"
+    publishDir "${params.outdir}/${sample_id}/bin_mash_sketching/", mode: "copy"
 
     input:
     tuple val(sample_id), file('bins/*')
@@ -310,7 +310,7 @@ process bin_mash_sketching {
 }
 
 process rrna_detection {
-    publishDir "${params.outdir}/${sample_id}/rrna/"
+    publishDir "${params.outdir}/${sample_id}/rrna/", mode: "copy"
 
     input:
     tuple val(sample_id), file(unfiltered_assembly)
@@ -332,7 +332,7 @@ process rrna_detection {
 
 
 process abricate {
-    publishDir "${params.outdir}/${sample_id}/abricate/"
+    publishDir "${params.outdir}/${sample_id}/abricate/", mode: "copy"
 
     input:
     tuple val(sample_id), file(genecalls_fna)
@@ -350,7 +350,7 @@ process abricate {
 }
 
 process macrel {
-    publishDir "${params.outdir}/${sample_id}/macrel/"
+    publishDir "${params.outdir}/${sample_id}/macrel/", mode: "copy"
 
     input:
     tuple val(sample_id), file(unfiltered_assembly)
@@ -366,7 +366,7 @@ process macrel {
 }
 
 process gunc {
-    publishDir "${params.outdir}/${sample_id}/gunc/"
+    publishDir "${params.outdir}/${sample_id}/gunc/", mode: "copy"
 
     input:
     tuple val(sample_id), path('bins/*')
@@ -387,7 +387,7 @@ process gunc {
 }
 
 process eggnog_mapper {
-    publishDir "${params.outdir}/${sample_id}/eggnog_mapper/"
+    publishDir "${params.outdir}/${sample_id}/eggnog_mapper/", mode: "copy"
 
     input:
     tuple val(sample_id), file(gene_calls)
@@ -416,7 +416,7 @@ process eggnog_mapper {
 
 
 process checkm2 {
-    publishDir "${params.outdir}/${sample_id}/checkm2/"
+    publishDir "${params.outdir}/${sample_id}/checkm2/", mode: "copy"
 
     input:
     tuple val(sample_id), path('bins/*')
@@ -434,7 +434,7 @@ process checkm2 {
 }
 
 process rgiv6 {
-    publishDir "${params.outdir}/${sample_id}/rgiv6/"
+    publishDir "${params.outdir}/${sample_id}/rgiv6/", mode: "copy"
 
     input:
     tuple val(sample_id), file('genecalls/*')
@@ -457,7 +457,7 @@ process rgiv6 {
 }
 
 process gtdbtk {
-    publishDir "${params.outdir}/${sample_id}/gtdbtk/"
+    publishDir "${params.outdir}/${sample_id}/gtdbtk/", mode: "copy"
 
     input:
     tuple val(sample_id), file('bins/*')
