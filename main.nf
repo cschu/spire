@@ -237,8 +237,8 @@ process per_bin_genecalling {
       zcat \$bin | grep ">" | cut -c2- | cut -d " " -f1 | sed -e 's/\$/_/' > \${bin_id}.contig.names
 
       ## Get all genenames contining bin names
-      grep -f \${bin_id}.contig.names genecalls_extracted.faa.ids > \${bin_id}.faa.gene_names
-      grep -f \${bin_id}.contig.names genecalls_extracted.fna.ids > \${bin_id}.fna.gene_names
+      grep -F -f \${bin_id}.contig.names genecalls_extracted.faa.ids > \${bin_id}.faa.gene_names
+      grep -F -f \${bin_id}.contig.names genecalls_extracted.fna.ids > \${bin_id}.fna.gene_names
 
       ## Get all sequences with genenames in fasta_search
       seqtk subseq -l 60 genecalls_extracted.faa \${bin_id}.faa.gene_names > ${sample_id}/\${bin_id}.extracted.faa
