@@ -378,7 +378,7 @@ process gunc {
 
     script:
     """
-    gunc run -d bins -e .fa.gz --detailed_output
+    gunc run -d bins -e .fa.gz -v --detailed_output
     mv gunc_output ${sample_id}.GUNC.all_levels
     mv GUNC.progenomes_2.1.maxCSS_level.tsv ${sample_id}.GUNC.maxCSS_level.tsv
     add_gunc5_score.py -m ${sample_id}.GUNC.maxCSS_level.tsv -d ${sample_id}.GUNC.all_levels -o ${sample_id}.GUNC.maxCSS_level_gunc5.tsv
