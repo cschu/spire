@@ -212,10 +212,10 @@ process per_bin_genecalling {
     publishDir "${params.outdir}/${sample_id}/per_bin_genecalls/", mode: "copy"
 
     input:
-    tuple val(sample_id), file('bins/*'), file(genecalls_faa), file(genecalls_fna)
+    tuple val(sample_id), val(bin_id), file('bins/*'), file(genecalls_faa), file(genecalls_fna)
 
     output:
-    tuple val(sample_id), file("${sample_id}/*"), emit: bincalls
+    tuple val(sample_id), val(bin_id), file("${sample_id}/*"), emit: bincalls
 
     script:
     //   cat genecalls_extracted.faa.ids | grep -f \${bin_id}.contig.names | cut -c2- | cut -f1 -d" " > \${bin_id}.faa.gene_names
@@ -369,19 +369,21 @@ process gunc {
     publishDir "${params.outdir}/${sample_id}/gunc/", mode: "copy"
 
     input:
-    tuple val(sample_id), path('bins/*')
+    // tuple val(sample_id), path('bins/*')
+    tuple val(sample_id), val(bin_id), path(proteins)
 
     output:
-    file("${sample_id}.GUNC.maxCSS_level.tsv")
-    file("${sample_id}.GUNC.maxCSS_level_gunc5.tsv")
-    file("${sample_id}.GUNC.all_levels/*")
+    file("${sample_id}.${bin_id}.GUNC.maxCSS_level.tsv")
+    file("${sample_id}.${bin_id}.GUNC.maxCSS_level_gunc5.tsv")
+    file("${sample_id}.${bin_id}.GUNC.all_levels/*")
 
     script:
+    // gunc run -d bins -e .fa.gz --detailed_output
     """
-    gunc run -d bins -e .fa.gz -v --detailed_output
-    mv gunc_output ${sample_id}.GUNC.all_levels
-    mv GUNC.progenomes_2.1.maxCSS_level.tsv ${sample_id}.GUNC.maxCSS_level.tsv
-    add_gunc5_score.py -m ${sample_id}.GUNC.maxCSS_level.tsv -d ${sample_id}.GUNC.all_levels -o ${sample_id}.GUNC.maxCSS_level_gunc5.tsv
+    gunc run -i ${proteins} -g -t ${task.cpus} --detailed_output
+    mv gunc_output ${sample_id}.${bin_id}.GUNC.all_levels
+    mv GUNC.progenomes_2.1.maxCSS_level.tsv ${sample_id}.${bin_id}.GUNC.maxCSS_level.tsv
+    add_gunc5_score.py -m ${sample_id}.${bin_id}.GUNC.maxCSS_level.tsv -d ${sample_id}.${bin_id}.GUNC.all_levels -o ${sample_id}.${bin_id}.GUNC.maxCSS_level_gunc5.tsv
     sleep 2
     """
 }
@@ -513,7 +515,8 @@ workflow {
     calls = binning.out.join(gene_calling_prodigal.out.genecalls_faa).join(gene_calling_prodigal.out.genecalls_fna)
         .flatMap { sample_id, bins, proteins, genes -> 
             bins.collect {
-                bin -> tuple(sample_id, bin, proteins, genes)
+                bin -> tuple(sample_id, bin.name.replaceAll(/.+\.([0-9]+)\.fa.gz$/, "$1"), bin, proteins, genes)
+                //SAMEA112553566.psa_nanopore_flye2.psb_metabat2.00003.fa.gz
             }
         }
 
@@ -527,8 +530,9 @@ workflow {
     bin_mash_sketching(binning.out)
     rrna_detection(contigs_ch)
     abricate(gene_calling_prodigal.out.genecalls_fna)
-    macrel(contigs_ch)
-    gunc(binning.out)
+    macrel(assembly.out)
+    // gunc(binning.out)
+    gunc(per_bin_genecalling.out.map { sample_id, files -> return tuple(sample_id, files[0].name.replaceAll(.+\.([0-9]+)\.extracted.f[an]a$/, "$1"), files[0]) })
     checkm2(binning.out)
     eggnog_mapper(gene_calling_prodigal.out.genecalls_faa)
     rgiv6(per_bin_genecalling.out.bincalls)
