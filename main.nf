@@ -535,6 +535,6 @@ workflow {
     gunc(per_bin_genecalling.out.map { sample_id, files -> return tuple(sample_id, files[0].name.replaceAll(/.+\.([0-9]+)\.extracted.f[an]a$/, '$1'), files[0]) })
     checkm2(binning.out)
     eggnog_mapper(gene_calling_prodigal.out.genecalls_faa)
-    rgiv6(per_bin_genecalling.out.bincalls)
+    rgiv6(per_bin_genecalling.out.bincalls.map { sample_id, bin_id, files -> return tuple(sample_id, files) } )
     gtdbtk(binning.out)
 }
