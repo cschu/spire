@@ -515,7 +515,7 @@ workflow {
     calls = binning.out.join(gene_calling_prodigal.out.genecalls_faa).join(gene_calling_prodigal.out.genecalls_fna)
         .flatMap { sample_id, bins, proteins, genes -> 
             bins.collect {
-                bin -> tuple(sample_id, bin.name.replaceAll(/.+\.([0-9]+)\.fa.gz$/, "$1"), bin, proteins, genes)
+                bin -> tuple(sample_id, bin.name.replaceAll(/.+\.([0-9]+)\.fa.gz$/, '$1'), bin, proteins, genes)
                 //SAMEA112553566.psa_nanopore_flye2.psb_metabat2.00003.fa.gz
             }
         }
@@ -532,7 +532,7 @@ workflow {
     abricate(gene_calling_prodigal.out.genecalls_fna)
     macrel(assembly.out)
     // gunc(binning.out)
-    gunc(per_bin_genecalling.out.map { sample_id, files -> return tuple(sample_id, files[0].name.replaceAll(.+\.([0-9]+)\.extracted.f[an]a$/, "$1"), files[0]) })
+    gunc(per_bin_genecalling.out.map { sample_id, files -> return tuple(sample_id, files[0].name.replaceAll(.+\.([0-9]+)\.extracted.f[an]a$/, '$1'), files[0]) })
     checkm2(binning.out)
     eggnog_mapper(gene_calling_prodigal.out.genecalls_faa)
     rgiv6(per_bin_genecalling.out.bincalls)
