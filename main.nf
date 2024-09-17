@@ -380,7 +380,7 @@ process gunc {
     script:
     // gunc run -d bins -e .fa.gz --detailed_output
     """
-    gunc run -i ${proteins} -g -t ${task.cpus} --detailed_output
+    gunc run -i ${proteins} -v -g -t ${task.cpus} --detailed_output
     mv gunc_output ${sample_id}.${bin_id}.GUNC.all_levels
     mv GUNC.progenomes_2.1.maxCSS_level.tsv ${sample_id}.${bin_id}.GUNC.maxCSS_level.tsv
     add_gunc5_score.py -m ${sample_id}.${bin_id}.GUNC.maxCSS_level.tsv -d ${sample_id}.${bin_id}.GUNC.all_levels -o ${sample_id}.${bin_id}.GUNC.maxCSS_level_gunc5.tsv
@@ -530,7 +530,7 @@ workflow {
     bin_mash_sketching(binning.out)
     rrna_detection(contigs_ch)
     abricate(gene_calling_prodigal.out.genecalls_fna)
-    macrel(assembly.out)
+    macrel(contigs_ch)
     // gunc(binning.out)
     gunc(per_bin_genecalling.out.map { sample_id, files -> return tuple(sample_id, files[0].name.replaceAll(/.+\.([0-9]+)\.extracted.f[an]a$/, '$1'), files[0]) })
     checkm2(binning.out)
