@@ -430,7 +430,7 @@ process checkm2 {
     """
     cp -Lr bins uncompressed_bins
     gunzip uncompressed_bins/*
-    checkm2 --threads ${task.cpus} predict -i uncompressed_bins -o out -x .fa
+    checkm2 predict --threads ${task.cpus} -i uncompressed_bins -o out -x .fa
     mv out/quality_report.tsv ${sample_id}.checkm2.tsv
     """
 }
