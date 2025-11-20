@@ -1,4 +1,7 @@
 #!/usr/bin/env nextflow
+
+include { manage_inputs } from "./workflows/input"
+
  
 process preprocess_fastqs {
     publishDir "${params.outdir}/${sample_id}/filtering/${sample_id}", mode: "copy"
@@ -17,7 +20,7 @@ process preprocess_fastqs {
     mv $fastq_files ${sample_id}
 
     create_ngless_template_files.py -r ${params.NGLESS_REFERENCE}
-    ngless -t ./ raw_data_filter.ngl -j ${task.cpus} ./ ${sample_id}
+    ngless-wrapped -t ./ raw_data_filter.ngl -j ${task.cpus} ./ ${sample_id}
     cat raw_data_filter.ngl.output_ngless/fq.tsv > ${sample_id}_read_count_after_qc.txt
     """
 }
@@ -401,16 +404,21 @@ process eggnog_mapper {
 
     script:
     """
-    cp -R ${params.EGGNOG_DATA_DIR} ./
-    export EGGNOG_DATA_DIR='./5.0.2/'
+    mkdir -p eggnog_data
+    find ${params.EGGNOG_DATA_DIR} -type f -exec ln -s {} eggnog_data/ \\;
+    rm -f eggnog_data/eggnog.db
+    cp -v ${params.EGGNOG_DATA_DIR}/eggnog.db eggnog_data/
+
     zcat ${gene_calls} > ${sample_id}.genecalls.faa
-    emapper.py -i ${sample_id}.genecalls.faa --output ${sample_id} --dbmem -m diamond --cpu ${task.cpus} --tax_scope prokaryota_broad
+    emapper.py --data_dir eggnog_data -i ${sample_id}.genecalls.faa --output ${sample_id} --dbmem -m diamond --cpu ${task.cpus} --tax_scope prokaryota_broad
 
     if [[ -s ${sample_id}.emapper.pfam ]]
     then
         sed -i -e '/^[ \t]*#/d' ${sample_id}.emapper.pfam
     fi
     gzip ${sample_id}.emapper*
+
+    rm -f eggnog_data/eggnog.db
     sleep 2
     """
 
@@ -470,63 +478,56 @@ process gtdbtk {
     script:
     """
     mkdir ${sample_id}
-    gtdbtk classify_wf --cpus 24 --pplacer_cpus 24 --genome_dir ./bins --out_dir ${sample_id} --extension .fa.gz
+    gtdbtk classify_wf --mash_db ./mash.db --cpus ${task.cpus} --pplacer_cpus ${task.cpus} --genome_dir ./bins --out_dir ${sample_id} --extension .fa.gz
     """
 }
 
 workflow {
 
     print "PARAMS: ${params}"
-
-    // if (params.NCBI_API_KEY == 'none') {
-    // input_samples = Channel
-    //     .fromSRA(params.input_SRA_id)
-    //     .view()
-    // }
-    // else {
-    // input_samples = Channel
-    //     .fromSRA(params.input_SRA_id, apiKey:params.NCBI_API_KEY)
-    //     .view()
-    // }
-
-    // preprocess_fastqs(input_samples)
-    // assembly(preprocess_fastqs.out.filtered)
-    // gene_calling_prodigal(assembly.out)
-    // remove_small_contigs(assembly.out)
-    // index(remove_small_contigs.out)
-    // alignment(remove_small_contigs.out.join(index.out).join(preprocess_fastqs.out.filtered))
-    // depths(alignment.out)
-
-    contigs_ch = Channel.fromPath(params.assembly_input + "/**.${params.suffix_pattern}")
-        .map { file -> return tuple(file.getParent().getName(), file) }
-
-    contigs_ch.dump(pretty: true, tag: "contigs_ch")
     
-    depth_ch = Channel.fromPath(params.depth_input + "/**.tsv")
-        .map { file -> return tuple(file.getParent().getName(), file) }
+    manage_inputs()
 
-    depth_ch.dump(pretty: true, tag: "depth_ch")
+    if (params.input_source == "long_reads") {
 
-    gene_calling_prodigal(contigs_ch)
+        contigs_ch = manage_inputs.out.contigs
+        depth_ch = manage_inputs.out.depths
 
-    // binning(depths.out.join(remove_small_contigs.out))
-    binning(depth_ch.join(contigs_ch, by: 0))
+        gene_calling_prodigal(contigs_ch)
 
-    calls = binning.out.join(gene_calling_prodigal.out.genecalls_faa).join(gene_calling_prodigal.out.genecalls_fna)
-        .flatMap { sample_id, bins, proteins, genes -> 
-            bins.collect {
-                bin -> tuple(sample_id, bin.name.replaceAll(/.+\.([0-9]+)\.fa.gz$/, '$1'), bin, proteins, genes)
-                //SAMEA112553566.psa_nanopore_flye2.psb_metabat2.00003.fa.gz
+        binning(depth_ch.join(contigs_ch, by: 0))
+
+        calls = binning.out.join(gene_calling_prodigal.out.genecalls_faa).join(gene_calling_prodigal.out.genecalls_fna)
+            .flatMap { sample_id, bins, proteins, genes -> 
+                bins.collect {
+                    bin -> tuple(sample_id, bin.name.replaceAll(/.+\.([0-9]+)\.fa.gz$/, '$1'), bin, proteins, genes)
+                    //SAMEA112553566.psa_nanopore_flye2.psb_metabat2.00003.fa.gz
+                }
             }
-        }
 
-    per_bin_genecalling(calls)
+        per_bin_genecalling(calls)
 
-    bincalls = per_bin_genecalling.out.bincalls
-        .groupTuple(by: 0)
+        bincalls = per_bin_genecalling.out.bincalls
+            .groupTuple(by: 0)
 
+    } else {
+
+        preprocess_fastqs(manage_inputs.out.reads)
+        assembly(preprocess_fastqs.out.filtered)
+        contigs_ch = assembly.out
+        gene_calling_prodigal(contigs_ch)
+        remove_small_contigs(contigs_ch)
+        index(remove_small_contigs.out)
+        alignment(remove_small_contigs.out.join(index.out).join(preprocess_fastqs.out.filtered))
+        depths(alignment.out)
+        binning(depths.out.join(remove_small_contigs.out))
+        per_bin_genecalling(binning.out.join(gene_calling_prodigal.out.genecalls_faa).join(gene_calling_prodigal.out.genecalls_fna))
+
+    }
+    
     assembly_stats(contigs_ch)
     assembly_mash_sketching(contigs_ch)
+    
     bin_mash_sketching(binning.out)
     rrna_detection(contigs_ch)
     abricate(gene_calling_prodigal.out.genecalls_fna)
