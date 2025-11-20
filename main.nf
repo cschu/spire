@@ -1,7 +1,10 @@
 #!/usr/bin/env nextflow
+
+include { manage_inputs } from "./workflows/input"
+
  
 process preprocess_fastqs {
-    publishDir "${params.outdir}/${sample_id}/filtering/${sample_id}"
+    publishDir "${params.outdir}/${sample_id}/filtering/${sample_id}", mode: "copy"
 
     input:
     tuple val(sample_id), path(fastq_files)
@@ -23,7 +26,7 @@ process preprocess_fastqs {
 }
 
 process assembly {
-    publishDir "${params.outdir}/${sample_id}/assemblies/"
+    publishDir "${params.outdir}/${sample_id}/assemblies/", mode: "copy"
 
     input:
     tuple val(sample_id), path('*')
@@ -62,7 +65,7 @@ process assembly {
 }
 
 process gene_calling_prodigal {
-    publishDir "${params.outdir}/${sample_id}/prodigal/"
+    publishDir "${params.outdir}/${sample_id}/prodigal/", mode: "copy"
     
     input:
     tuple val(sample_id), file(unfiltered_assembly)
@@ -154,7 +157,7 @@ process alignment {
 }
 
 process depths {
-    publishDir "${params.outdir}/${sample_id}/bins/"
+    publishDir "${params.outdir}/${sample_id}/bins/", mode: "copy"
 
     input:
     tuple val(sample_id), file(bam_file)
@@ -169,7 +172,7 @@ process depths {
 }
 
 process binning {
-    publishDir "${params.outdir}/${sample_id}/"
+    publishDir "${params.outdir}/${sample_id}/", mode: "copy"
 
     input:
     tuple val(sample_id), file(depthfile), file(assembly_file)
@@ -179,9 +182,10 @@ process binning {
 
     script:
     def sample_basename = "${sample_id}.${params.assemblytype}.${params.bintype}"
+            //  -i ${sample_id}-assembled.fa.filtered.fasta \
     """
     metabat2 --verbose \
-             -i ${sample_id}-assembled.fa.filtered.fasta \
+             -i ${assembly_file} \
              -a ${depthfile} \
              -t 4 \
              --seed 1987 \
@@ -208,17 +212,25 @@ process binning {
 }
 
 process per_bin_genecalling {
-    publishDir "${params.outdir}/${sample_id}/per_bin_genecalls/"
+    publishDir "${params.outdir}/${sample_id}/per_bin_genecalls/", mode: "copy"
 
     input:
-    tuple val(sample_id), file('bins/*'), file(genecalls_faa), file(genecalls_fna)
+    tuple val(sample_id), val(bin_id), file('bins/*'), file(genecalls_faa), file(genecalls_fna)
 
     output:
-    tuple val(sample_id), file("${sample_id}/*")
+    tuple val(sample_id), val(bin_id), file("${sample_id}/*"), emit: bincalls
 
     script:
+    //   cat genecalls_extracted.faa.ids | grep -f \${bin_id}.contig.names | cut -c2- | cut -f1 -d" " > \${bin_id}.faa.gene_names
+    //   cat genecalls_extracted.fna.ids | grep -f \${bin_id}.contig.names | cut -c2- | cut -f1 -d" " > \${bin_id}.fna.gene_names
     """
     mkdir ${sample_id}
+
+    gzip -dc ${genecalls_faa} > genecalls_extracted.faa
+    gzip -dc ${genecalls_fna} > genecalls_extracted.fna
+
+    grep "^>" genecalls_extracted.faa | cut -c2- | cut -f1 -d" " > genecalls_extracted.faa.ids
+    grep "^>" genecalls_extracted.fna | cut -c2- | cut -f1 -d" " > genecalls_extracted.fna.ids
 
     for bin in bins/*
     do
@@ -228,12 +240,12 @@ process per_bin_genecalling {
       zcat \$bin | grep ">" | cut -c2- | cut -d " " -f1 | sed -e 's/\$/_/' > \${bin_id}.contig.names
 
       ## Get all genenames contining bin names
-      zcat ${genecalls_faa} | grep -f \${bin_id}.contig.names | cut -c2- | cut -f1 -d" " > \${bin_id}.faa.gene_names
-      zcat ${genecalls_fna} | grep -f \${bin_id}.contig.names | cut -c2- | cut -f1 -d" " > \${bin_id}.fna.gene_names
+      grep -F -f \${bin_id}.contig.names genecalls_extracted.faa.ids > \${bin_id}.faa.gene_names
+      grep -F -f \${bin_id}.contig.names genecalls_extracted.fna.ids > \${bin_id}.fna.gene_names
 
       ## Get all sequences with genenames in fasta_search
-      seqtk subseq -l 60 ${genecalls_faa} \${bin_id}.faa.gene_names > ${sample_id}/\${bin_id}.extracted.faa
-      seqtk subseq -l 60 ${genecalls_fna} \${bin_id}.fna.gene_names > ${sample_id}/\${bin_id}.extracted.fna
+      seqtk subseq -l 60 genecalls_extracted.faa \${bin_id}.faa.gene_names > ${sample_id}/\${bin_id}.extracted.faa
+      seqtk subseq -l 60 genecalls_extracted.fna \${bin_id}.fna.gene_names > ${sample_id}/\${bin_id}.extracted.fna
     done
     for x in ${sample_id}/*;
     do
@@ -242,11 +254,13 @@ process per_bin_genecalling {
           rm \$x
       fi
     done
+
+    rm -rvf genecalls_extracted.faa genecalls_extracted.fna genecalls_extracted.faa.ids genecalls_extracted.fna.ids
     """
 }
 
 process assembly_stats {
-    publishDir "${params.outdir}/${sample_id}/assembly_stats/"
+    publishDir "${params.outdir}/${sample_id}/assembly_stats/", mode: "copy"
 
     input:
     tuple val(sample_id), file(unfiltered_assembly)
@@ -263,7 +277,7 @@ process assembly_stats {
 }
 
 process assembly_mash_sketching {
-    publishDir "${params.outdir}/${sample_id}/assembly_mash_sketching/"
+    publishDir "${params.outdir}/${sample_id}/assembly_mash_sketching/", mode: "copy"
 
     input:
     tuple val(sample_id), file(unfiltered_assembly)
@@ -279,7 +293,7 @@ process assembly_mash_sketching {
 }
 
 process bin_mash_sketching {
-    publishDir "${params.outdir}/${sample_id}/bin_mash_sketching/"
+    publishDir "${params.outdir}/${sample_id}/bin_mash_sketching/", mode: "copy"
 
     input:
     tuple val(sample_id), file('bins/*')
@@ -299,7 +313,7 @@ process bin_mash_sketching {
 }
 
 process rrna_detection {
-    publishDir "${params.outdir}/${sample_id}/rrna/"
+    publishDir "${params.outdir}/${sample_id}/rrna/", mode: "copy"
 
     input:
     tuple val(sample_id), file(unfiltered_assembly)
@@ -321,7 +335,7 @@ process rrna_detection {
 
 
 process abricate {
-    publishDir "${params.outdir}/${sample_id}/abricate/"
+    publishDir "${params.outdir}/${sample_id}/abricate/", mode: "copy"
 
     input:
     tuple val(sample_id), file(genecalls_fna)
@@ -339,7 +353,7 @@ process abricate {
 }
 
 process macrel {
-    publishDir "${params.outdir}/${sample_id}/macrel/"
+    publishDir "${params.outdir}/${sample_id}/macrel/", mode: "copy"
 
     input:
     tuple val(sample_id), file(unfiltered_assembly)
@@ -355,28 +369,30 @@ process macrel {
 }
 
 process gunc {
-    publishDir "${params.outdir}/${sample_id}/gunc/"
+    publishDir "${params.outdir}/${sample_id}/gunc/", mode: "copy"
 
     input:
-    tuple val(sample_id), path('bins/*')
+    // tuple val(sample_id), path('bins/*')
+    tuple val(sample_id), val(bin_id), path(proteins)
 
     output:
-    file("${sample_id}.GUNC.maxCSS_level.tsv")
-    file("${sample_id}.GUNC.maxCSS_level_gunc5.tsv")
-    file("${sample_id}.GUNC.all_levels/*")
+    file("${sample_id}.${bin_id}.GUNC.maxCSS_level.tsv")
+    file("${sample_id}.${bin_id}.GUNC.maxCSS_level_gunc5.tsv")
+    file("${sample_id}.${bin_id}.GUNC.all_levels/*")
 
     script:
+    // gunc run -d bins -e .fa.gz --detailed_output
     """
-    gunc run -d bins -e .fa.gz --detailed_output
-    mv gunc_output ${sample_id}.GUNC.all_levels
-    mv GUNC.progenomes_2.1.maxCSS_level.tsv ${sample_id}.GUNC.maxCSS_level.tsv
-    add_gunc5_score.py -m ${sample_id}.GUNC.maxCSS_level.tsv -d ${sample_id}.GUNC.all_levels -o ${sample_id}.GUNC.maxCSS_level_gunc5.tsv
+    gunc run -i ${proteins} -e .faa -v -g -t ${task.cpus} --detailed_output
+    mv gunc_output ${sample_id}.${bin_id}.GUNC.all_levels
+    mv GUNC.progenomes_2.1.maxCSS_level.tsv ${sample_id}.${bin_id}.GUNC.maxCSS_level.tsv
+    add_gunc5_score.py -m ${sample_id}.${bin_id}.GUNC.maxCSS_level.tsv -d ${sample_id}.${bin_id}.GUNC.all_levels -o ${sample_id}.${bin_id}.GUNC.maxCSS_level_gunc5.tsv
     sleep 2
     """
 }
 
 process eggnog_mapper {
-    publishDir "${params.outdir}/${sample_id}/eggnog_mapper/"
+    publishDir "${params.outdir}/${sample_id}/eggnog_mapper/", mode: "copy"
 
     input:
     tuple val(sample_id), file(gene_calls)
@@ -410,7 +426,7 @@ process eggnog_mapper {
 
 
 process checkm2 {
-    publishDir "${params.outdir}/${sample_id}/checkm2/"
+    publishDir "${params.outdir}/${sample_id}/checkm2/", mode: "copy"
 
     input:
     tuple val(sample_id), path('bins/*')
@@ -422,13 +438,13 @@ process checkm2 {
     """
     cp -Lr bins uncompressed_bins
     gunzip uncompressed_bins/*
-    checkm2 predict -i uncompressed_bins -o out -x .fa
+    checkm2 predict --threads ${task.cpus} -i uncompressed_bins -o out -x .fa
     mv out/quality_report.tsv ${sample_id}.checkm2.tsv
     """
 }
 
 process rgiv6 {
-    publishDir "${params.outdir}/${sample_id}/rgiv6/"
+    publishDir "${params.outdir}/${sample_id}/rgiv6/", mode: "copy"
 
     input:
     tuple val(sample_id), file('genecalls/*')
@@ -451,7 +467,7 @@ process rgiv6 {
 }
 
 process gtdbtk {
-    publishDir "${params.outdir}/${sample_id}/gtdbtk/"
+    publishDir "${params.outdir}/${sample_id}/gtdbtk/", mode: "copy"
 
     input:
     tuple val(sample_id), file('bins/*')
@@ -468,62 +484,58 @@ process gtdbtk {
 
 workflow {
 
-    if (params.input_source == "sra") {
-        if (params.NCBI_API_KEY == 'none') {
-            input_samples = Channel
-                .fromSRA(params.input_SRA_id)
-                .dump(pretty:true, tag: "input_data")
-        }
-        else {
-            input_samples = Channel
-                .fromSRA(params.input_SRA_id, apiKey:params.NCBI_API_KEY)
-                .dump(pretty:true, tag: "input_data")
-        }
+    print "PARAMS: ${params}"
+    
+    manage_inputs()
 
-    } else if (params.input_source == "disk") {
+    if (params.input_source == "long_reads") {
 
-        input_samples = Channel.fromPath("${params.input_dir}/**[._]{fastq.gz,fq.gz,fastq.bz2,fq.bz2}")			
+        contigs_ch = manage_inputs.out.contigs
+        depth_ch = manage_inputs.out.depths
 
-        if (params.input_dir_structure == "flat") {
-			input_samples = input_samples
-				.map { file -> [ 
-					file.getName()
-						.replaceAll(/\.(fastq|fq)(\.(gz|bz2))?$/, "")
-						.replaceAll(/[._]R?[12]$/, "")
-						.replaceAll(/[._]singles$/, ""),
-					file
-				] }
+        gene_calling_prodigal(contigs_ch)
 
-		} else {
-			input_samples = input_samples
-				.map { file -> [ file.getParent().getName(), file ] }
-		}
+        binning(depth_ch.join(contigs_ch, by: 0))
 
-        input_samples = input_samples
+        calls = binning.out.join(gene_calling_prodigal.out.genecalls_faa).join(gene_calling_prodigal.out.genecalls_fna)
+            .flatMap { sample_id, bins, proteins, genes -> 
+                bins.collect {
+                    bin -> tuple(sample_id, bin.name.replaceAll(/.+\.([0-9]+)\.fa.gz$/, '$1'), bin, proteins, genes)
+                    //SAMEA112553566.psa_nanopore_flye2.psb_metabat2.00003.fa.gz
+                }
+            }
+
+        per_bin_genecalling(calls)
+
+        bincalls = per_bin_genecalling.out.bincalls
             .groupTuple(by: 0)
-            .dump(pretty:true, tag: "input_data")
+
+    } else {
+
+        preprocess_fastqs(manage_inputs.out.reads)
+        assembly(preprocess_fastqs.out.filtered)
+        contigs_ch = assembly.out
+        gene_calling_prodigal(contigs_ch)
+        remove_small_contigs(contigs_ch)
+        index(remove_small_contigs.out)
+        alignment(remove_small_contigs.out.join(index.out).join(preprocess_fastqs.out.filtered))
+        depths(alignment.out)
+        binning(depths.out.join(remove_small_contigs.out))
+        per_bin_genecalling(binning.out.join(gene_calling_prodigal.out.genecalls_faa).join(gene_calling_prodigal.out.genecalls_fna))
 
     }
-
-
-    preprocess_fastqs(input_samples)
-    assembly(preprocess_fastqs.out.filtered)
-    gene_calling_prodigal(assembly.out)
-    remove_small_contigs(assembly.out)
-    index(remove_small_contigs.out)
-    alignment(remove_small_contigs.out.join(index.out).join(preprocess_fastqs.out.filtered))
-    depths(alignment.out)
-    binning(depths.out.join(remove_small_contigs.out))
-    per_bin_genecalling(binning.out.join(gene_calling_prodigal.out.genecalls_faa).join(gene_calling_prodigal.out.genecalls_fna))
-    assembly_stats(assembly.out)
-    assembly_mash_sketching(assembly.out)
+    
+    assembly_stats(contigs_ch)
+    assembly_mash_sketching(contigs_ch)
+    
     bin_mash_sketching(binning.out)
-    rrna_detection(assembly.out)
+    rrna_detection(contigs_ch)
     abricate(gene_calling_prodigal.out.genecalls_fna)
-    macrel(assembly.out)
-    gunc(binning.out)
+    macrel(contigs_ch)
+    // gunc(binning.out)
+    gunc(per_bin_genecalling.out.map { sample_id, bin_id, files -> return tuple(sample_id, bin_id, files[0]) })
     checkm2(binning.out)
     eggnog_mapper(gene_calling_prodigal.out.genecalls_faa)
-    rgiv6(per_bin_genecalling.out)
+    rgiv6(per_bin_genecalling.out.bincalls.map { sample_id, bin_id, files -> return tuple(sample_id, files) } )
     gtdbtk(binning.out)
 }
